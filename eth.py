@@ -1,7 +1,7 @@
 # eth.py
 
 from web3 import Web3
-from web3.middleware import geth_poa_middleware
+from web3.middleware import geth_poa_middleware # <-- v6 格式
 from web3.exceptions import TransactionNotFound
 from eth_account import Account
 
@@ -131,7 +131,7 @@ class EthereumService:
         # 签名交易
         signed_tx = self.w3.eth.account.sign_transaction(tx, from_private_key)
         # 发送已签名的交易到网络
-        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction).hex()
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction).hex() # <-- 关键修正点：使用 v6 语法的 rawTransaction
         
         if wait_for_receipt:
             self.wait_for_transaction_receipt(tx_hash)
@@ -179,7 +179,7 @@ class EthereumService:
         
         # 5. 签名并发送交易
         signed_tx = self.w3.eth.account.sign_transaction(transaction, private_key)
-        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.raw_transaction).hex()
+        tx_hash = self.w3.eth.send_raw_transaction(signed_tx.rawTransaction).hex() # <-- 关键修正点：使用 v6 语法的 rawTransaction
 
         # 6. (可选) 等待交易确认
         if wait_for_receipt:
