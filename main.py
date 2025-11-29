@@ -2,7 +2,7 @@ from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 
-@register("helloworld", "YourName", "一个简单的 Hello World 插件", "1.0.0")
+@register("astrbot_plugin_token_wallet", "GuJi08233", "基于以太坊智能合约代币的钱包", "v0.0.1", "https://github.com/GuJi08233/astrbot_plugin_token_wallet")
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
