@@ -1,7 +1,7 @@
 # eth.py
 
 from web3 import Web3
-from web3.middleware.geth_poa import geth_poa_middleware # <-- 这是修改后的行，以兼容 web3 v7+
+from web3.middleware import geth_poa_middleware
 from web3.exceptions import TransactionNotFound
 from eth_account import Account
 
