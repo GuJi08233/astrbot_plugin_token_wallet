@@ -12,13 +12,11 @@ from astrbot.api.event.filter import PermissionType
 from astrbot.core.message.components import At
 
 # --- 自定义模块导入 ---
-# 导入我们自己编写的服务层和数据库模型
-# 请确保 eth_service.py 和 db_models.py 与 main.py 在同一个文件夹下
-from .eth_service import EthereumService, ConnectionError, InsufficientFundsError, TransactionFailedError
-from .db_models import DatabaseManager, Wallet
+# 根据你的文件名 (eth.py, db.py) 进行导入
+from .eth import EthereumService, ConnectionError, InsufficientFundsError, TransactionFailedError
+from .db import DatabaseManager, Wallet
 
 # --- 全局常量 ---
-# 将帮助信息定义为常量，便于管理
 HELP_MESSAGE = """
 ===============
 💎 以太坊QQ钱包 💎
@@ -335,4 +333,3 @@ class EthWalletPlugin(Star):
         except Exception as e:
             logger.error(f"增发失败: {e}")
             yield event.plain_result(f"❌ 增发失败，请检查后台日志。")
-
