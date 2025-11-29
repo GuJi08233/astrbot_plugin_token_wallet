@@ -1,0 +1,38 @@
+{
+  "rpc_node_url": {
+    "type": "string",
+    "description": "RPC节点地址",
+    "default": ""
+  },
+  "contract_address": {
+    "type": "string",
+    "description": "智能合约地址",
+    "default": ""
+  },
+  "owner_private_key": {
+    "type": "string",
+    "description": "【高危】合约主人/资金池私钥",
+    "hint": "用于新用户注册时转账Gas费，以及执行增发等管理员操作。请务必妥善保管！",
+    "obvious_hint": true,
+    "default": ""
+  },
+  "database_url": {
+    "type": "string",
+    "description": "PostgreSQL数据库连接地址",
+    "hint": "格式: postgresql://user:password@host:port/dbname",
+    "default": ""
+  },
+  "registration_gas_fee_eth": {
+    "type": "float",
+    "description": "新用户注册时赠送的ETH数量",
+    "default": 0.1
+  },
+  "daily_check_in_reward": {
+    "type": "string",
+    "description": "每日签到奖励配置 (JSON格式)",
+    "hint": "请使用JSON格式配置一个奖励列表，包含'amount'(数量)和'weight'(权重)。系统会根据权重随机选择一个奖励。例如，权重900, 99, 1分别代表90%, 9.9%, 0.1%的概率。",
+    "default": "[{\"amount\": 1, \"weight\": 900}, {\"amount\": 2, \"weight\": 99}, {\"amount\": 3, \"weight\": 1}]",
+    "editor_mode": true,
+    "editor_language": "json"
+  }
+}
