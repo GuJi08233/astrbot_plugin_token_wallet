@@ -215,35 +215,33 @@ class EthWalletPlugin(Star):
 
         yield event.plain_result(f"⌛ 正在准备向用户 {target_qq_id} 转账 {amount} {self.token_symbol}，请稍候...")
         
-        # 获取用户锁，防止并发交易导致Nonce冲突
+        # 使用async with语法糖管理锁，自动处理acquire和release
         user_lock = self._get_user_lock(sender_qq_id)
-        await user_lock.acquire()
-        
-        session = self.db_manager.get_session()
-        try:
-            sender_wallet = session.query(Wallet).filter_by(qq_id=sender_qq_id).first()
-            receiver_wallet = session.query(Wallet).filter_by(qq_id=int(target_qq_id)).first()
-            
-            if not sender_wallet:
-                yield event.plain_result("❌ 错误：您还没有注册钱包，请先使用 /注册。")
-                return
-            if not receiver_wallet:
-                yield event.plain_result(f"❌ 错误：对方用户 ({target_qq_id}) 还没有注册钱包。")
-                return
+        async with user_lock:
+            session = self.db_manager.get_session()
+            try:
+                sender_wallet = session.query(Wallet).filter_by(qq_id=sender_qq_id).first()
+                receiver_wallet = session.query(Wallet).filter_by(qq_id=int(target_qq_id)).first()
+                
+                if not sender_wallet:
+                    yield event.plain_result("❌ 错误：您还没有注册钱包，请先使用 /注册。")
+                    return
+                if not receiver_wallet:
+                    yield event.plain_result(f"❌ 错误：对方用户 ({target_qq_id}) 还没有注册钱包。")
+                    return
 
-            tx_hash = self.eth_service.transfer_token(sender_wallet.eth_private_key, receiver_wallet.eth_address, amount)
-            yield event.plain_result(f"✅ 转账成功！\n您已向 {target_qq_id} 转账 {amount} {self.token_symbol}。\n交易哈希: `{tx_hash}`")
-        except InsufficientFundsError:
-            yield event.plain_result(f"❌ 转账失败：您的{self.token_symbol}余额不足！")
-        except TransactionFailedError as e:
-            logger.error(f"转账失败 from {sender_qq_id} to {target_qq_id}: {e}")
-            yield event.plain_result(f"❌ 转账失败：交易在链上执行失败，资金已退回。")
-        except Exception as e:
-            logger.error(f"转账时发生未知错误: {e}")
-            yield event.plain_result(f"❌ 转账失败，发生内部错误。")
-        finally:
-            user_lock.release()
-            session.close()
+                tx_hash = self.eth_service.transfer_token(sender_wallet.eth_private_key, receiver_wallet.eth_address, amount)
+                yield event.plain_result(f"✅ 转账成功！\n您已向 {target_qq_id} 转账 {amount} {self.token_symbol}。\n交易哈希: `{tx_hash}`")
+            except InsufficientFundsError:
+                yield event.plain_result(f"❌ 转账失败：您的{self.token_symbol}余额不足！")
+            except TransactionFailedError as e:
+                logger.error(f"转账失败 from {sender_qq_id} to {target_qq_id}: {e}")
+                yield event.plain_result(f"❌ 转账失败：交易在链上执行失败，资金已退回。")
+            except Exception as e:
+                logger.error(f"转账时发生未知错误: {e}")
+                yield event.plain_result(f"❌ 转账失败，发生内部错误。")
+            finally:
+                session.close()
 
     @filter.command("提现")
     async def withdraw_command(self, event: AstrMessageEvent, amount: int, address: str):
@@ -257,69 +255,65 @@ class EthWalletPlugin(Star):
         
         qq_id = int(event.get_sender_id())
         
-        # 获取用户锁，防止并发交易导致Nonce冲突
+        # 使用async with语法糖管理锁，自动处理acquire和release
         user_lock = self._get_user_lock(qq_id)
-        await user_lock.acquire()
-        
-        session = self.db_manager.get_session()
-        try:
-            wallet = session.query(Wallet).filter_by(qq_id=qq_id).first()
-            if not wallet:
-                yield event.plain_result("❌ 错误：您还没有注册钱包，请先使用 /注册。")
-                return
-            
-            yield event.plain_result(f"⌛ 正在向地址 {address} 提现 {amount} {self.token_symbol}，请稍候...")
-            tx_hash = self.eth_service.transfer_token(wallet.eth_private_key, address, amount)
-            yield event.plain_result(f"✅ 提现成功！\n交易哈希: `{tx_hash}`")
-        except InsufficientFundsError:
-            yield event.plain_result(f"❌ 提现失败：您的{self.token_symbol}余额不足！")
-        except Exception as e:
-            logger.error(f"提现失败 for {qq_id}: {e}")
-            yield event.plain_result(f"❌ 提现失败，发生内部错误。")
-        finally:
-            user_lock.release()
-            session.close()
+        async with user_lock:
+            session = self.db_manager.get_session()
+            try:
+                wallet = session.query(Wallet).filter_by(qq_id=qq_id).first()
+                if not wallet:
+                    yield event.plain_result("❌ 错误：您还没有注册钱包，请先使用 /注册。")
+                    return
+                
+                yield event.plain_result(f"⌛ 正在向地址 {address} 提现 {amount} {self.token_symbol}，请稍候...")
+                tx_hash = self.eth_service.transfer_token(wallet.eth_private_key, address, amount)
+                yield event.plain_result(f"✅ 提现成功！\n交易哈希: `{tx_hash}`")
+            except InsufficientFundsError:
+                yield event.plain_result(f"❌ 提现失败：您的{self.token_symbol}余额不足！")
+            except Exception as e:
+                logger.error(f"提现失败 for {qq_id}: {e}")
+                yield event.plain_result(f"❌ 提现失败，发生内部错误。")
+            finally:
+                session.close()
 
     @filter.command("签到")
     async def check_in_command(self, event: AstrMessageEvent):
         qq_id = int(event.get_sender_id())
         
-        # 获取用户锁，防止并发交易导致Nonce冲突
+        # 使用async with语法糖管理锁，自动处理acquire和release
         user_lock = self._get_user_lock(qq_id)
-        await user_lock.acquire()
-        
-        session = self.db_manager.get_session()
-        try:
-            wallet = session.query(Wallet).filter_by(qq_id=qq_id).first()
-            if not wallet:
-                yield event.plain_result("你还没有注册，请先发送 /注册")
-                return
-            
-            today = datetime.datetime.utcnow().date()
-            if wallet.last_check_in and wallet.last_check_in.date() == today:
-                yield event.plain_result("🤔 你今天已经签过到了，明天再来吧！")
-                return
-            
-            reward_amount = self._get_check_in_reward()
-            yield event.plain_result(f"⌛ 正在为你签到并发送{self.token_symbol}奖励，请稍候...")
-            
-            owner_pk = self.config.get("owner_private_key")
-            if not owner_pk:
-                yield event.plain_result("❌ 管理员未配置奖励私钥，无法发放奖励。")
-                return
+        async with user_lock:
+            session = self.db_manager.get_session()
+            try:
+                wallet = session.query(Wallet).filter_by(qq_id=qq_id).first()
+                if not wallet:
+                    yield event.plain_result("你还没有注册，请先发送 /注册")
+                    return
+                
+                today = datetime.datetime.utcnow().date()
+                if wallet.last_check_in and wallet.last_check_in.date() == today:
+                    yield event.plain_result("🤔 你今天已经签过到了，明天再来吧！")
+                    return
+                
+                reward_amount = self._get_check_in_reward()
+                yield event.plain_result(f"⌛ 正在为你签到并发送{self.token_symbol}奖励，请稍候...")
+                
+                owner_pk = self.config.get("owner_private_key")
+                if not owner_pk:
+                    yield event.plain_result("❌ 管理员未配置奖励私钥，无法发放奖励。")
+                    return
 
-            tx_hash = self.eth_service.mint_token(owner_pk, wallet.eth_address, reward_amount)
-            wallet.last_check_in = datetime.datetime.utcnow()
-            session.commit()
-            
-            yield event.plain_result(f"🎉 签到成功！你获得了 {reward_amount} {self.token_symbol}奖励！")
-        except Exception as e:
-            session.rollback()
-            logger.error(f"用户 {qq_id} 签到失败: {e}")
-            yield event.plain_result(f"❌ 签到失败，发生内部错误。")
-        finally:
-            user_lock.release()
-            session.close()
+                tx_hash = self.eth_service.mint_token(owner_pk, wallet.eth_address, reward_amount)
+                wallet.last_check_in = datetime.datetime.utcnow()
+                session.commit()
+                
+                yield event.plain_result(f"🎉 签到成功！你获得了 {reward_amount} {self.token_symbol}奖励！")
+            except Exception as e:
+                session.rollback()
+                logger.error(f"用户 {qq_id} 签到失败: {e}")
+                yield event.plain_result(f"❌ 签到失败，发生内部错误。")
+            finally:
+                session.close()
 
     @filter.command("排行榜")
     async def rank_command(self, event: AstrMessageEvent):
@@ -368,23 +362,19 @@ class EthWalletPlugin(Star):
             yield event.plain_result("❌ 增发数量必须大于0！")
             return
         
-        # 获取管理员锁，防止并发交易导致Nonce冲突
-        # 使用固定的管理员ID作为锁的key
+        # 使用async with语法糖管理管理员锁，防止并发增发导致Nonce冲突
         admin_id = 0  # 管理员固定ID
         admin_lock = self._get_user_lock(admin_id)
-        await admin_lock.acquire()
-            
-        try:
-            owner_pk = self.config.get("owner_private_key")
-            if not owner_pk:
-                yield event.plain_result("❌ 管理员私钥未在配置中设置！")
-                return
-                
-            yield event.plain_result(f"⌛ 正在向 {address} 增发 {amount} {self.token_symbol}...")
-            tx_hash = self.eth_service.mint_token(owner_pk, address, amount)
-            yield event.plain_result(f"✅ 增发成功！\n交易哈希: `{tx_hash}`")
-        except Exception as e:
-            logger.error(f"增发失败: {e}")
-            yield event.plain_result(f"❌ 增发失败，请检查后台日志。")
-        finally:
-            admin_lock.release()
+        async with admin_lock:
+            try:
+                owner_pk = self.config.get("owner_private_key")
+                if not owner_pk:
+                    yield event.plain_result("❌ 管理员私钥未在配置中设置！")
+                    return
+                    
+                yield event.plain_result(f"⌛ 正在向 {address} 增发 {amount} {self.token_symbol}...")
+                tx_hash = self.eth_service.mint_token(owner_pk, address, amount)
+                yield event.plain_result(f"✅ 增发成功！\n交易哈希: `{tx_hash}`")
+            except Exception as e:
+                logger.error(f"增发失败: {e}")
+                yield event.plain_result(f"❌ 增发失败，请检查后台日志。")
