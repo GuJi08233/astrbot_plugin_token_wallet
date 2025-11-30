@@ -29,12 +29,9 @@ HELP_MESSAGE = """
 /提现 <数量> <你的外部地址> - 将代币提到你自己的钱包
 /签到 - 每日签到领取代币
 /排行榜 - 查看代币持有者排行
-
---- 管理员命令 ---
-/增发 <数量> <地址> - 向指定地址增发代币
 """
 
-@register("eth_wallet", "GuJi08233", "基于以太坊的QQ代币钱包", "1.0.0", "https://github.com/GuJi08233/astrbot_plugin_token_wallet")
+@register("eth_wallet", "GuJi08233", "基于以太坊的QQ代币钱包", "1.0.1", "https://github.com/GuJi08233/astrbot_plugin_token_wallet")
 class EthWalletPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         """
