@@ -25,6 +25,7 @@ HELP_MESSAGE = """
 /注册 (或 /开户) - 创建你的链上钱包
 /余额 - 查询你的代币和ETH余额
 /我的账户 - 显示你的钱包地址
+/货币 - 查看代币名称、符号和总供应量
 /转账 <数量> @某人 - 给QQ好友转账
 /提现 <数量> <你的外部地址> - 将代币提到你自己的钱包
 /签到 - 每日签到领取代币
@@ -163,6 +164,25 @@ class EthWalletPlugin(Star):
             return
         
         yield event.plain_result(f"你的钱包地址是:\n{wallet.eth_address}")
+
+    @filter.command("货币")
+    async def token_info_command(self, event: AstrMessageEvent):
+        if not self.eth_service:
+            yield event.plain_result("❌ 插件初始化失败，请联系管理员检查后台日志。")
+            return
+            
+        try:
+            yield event.plain_result("⌛ 正在查询代币信息，请稍候...")
+            token_info = self.eth_service.get_token_info()
+            yield event.plain_result(
+                f"代币信息查询成功！\n"
+                f"🏷️ 名称: {token_info['name']}\n"
+                f"🔤 符号: {token_info['symbol']}\n"
+                f"💎 总供应量: {token_info['total_supply']}"
+            )
+        except Exception as e:
+            logger.error(f"查询代币信息失败: {e}")
+            yield event.plain_result("❌ 查询失败，请稍后再试。")
 
     @filter.command("转账")
     async def transfer_command(self, event: AstrMessageEvent, amount: int):
