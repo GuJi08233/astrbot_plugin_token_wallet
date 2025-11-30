@@ -148,6 +148,20 @@ class EthereumService:
         except Exception as e:
             raise EthereumServiceError(f"查询代币余额失败: {e}")
 
+    def get_token_info(self) -> dict:
+        """获取代币的基本信息（名称、符号、总供应量）。"""
+        try:
+            name = self.contract.functions.name().call()
+            symbol = self.contract.functions.symbol().call()
+            total_supply = self.contract.functions.totalSupply().call()
+            return {
+                'name': name,
+                'symbol': symbol,
+                'total_supply': int(total_supply)
+            }
+        except Exception as e:
+            raise EthereumServiceError(f"获取代币信息失败: {e}")
+
     def _execute_contract_transaction(self, function_call, private_key: str, wait_for_receipt: bool) -> str:
         """
         一个通用的内部辅助函数，用于估算Gas、构建、签名并发送所有合约交易。
