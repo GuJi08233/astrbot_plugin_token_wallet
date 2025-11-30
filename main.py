@@ -23,13 +23,13 @@ HELP_MESSAGE = """
 ===============
 /帮助 - 显示此帮助菜单
 /注册 (或 /开户) - 创建你的链上钱包
-/余额 - 查询你的代币和ETH余额
+/余额 - 查询你的{token_symbol}和ETH余额
 /我的账户 - 显示你的钱包地址
-/货币 - 查看代币名称、符号和总供应量
+/货币 - 查看{token_symbol}名称、符号和总供应量
 /转账 <数量> @某人 - 给QQ好友转账
-/提现 <数量> <你的外部地址> - 将代币提到你自己的钱包
-/签到 - 每日签到领取代币
-/排行榜 - 查看代币持有者排行
+/提现 <数量> <你的外部地址> - 将{token_symbol}提到你自己的钱包
+/签到 - 每日签到领取{token_symbol}
+/排行榜 - 查看{token_symbol}持有者排行
 """
 
 @register("eth_wallet", "GuJi08233", "基于以太坊的QQ代币钱包", "1.0.1", "https://github.com/GuJi08233/astrbot_plugin_token_wallet")
@@ -43,6 +43,7 @@ class EthWalletPlugin(Star):
         self.config = config
         self.eth_service = None
         self.db_manager = None
+        self.token_symbol = "代币"  # 默认代币符号
 
         try:
             # 1. 初始化以太坊服务
@@ -50,7 +51,11 @@ class EthWalletPlugin(Star):
                 rpc_url=config.get("rpc_node_url"),
                 contract_address=config.get("contract_address")
             )
-            # 2. 初始化数据库管理器
+            # 2. 获取代币符号
+            token_info = self.eth_service.get_token_info()
+            self.token_symbol = token_info['symbol']
+            logger.info(f"✅ 代币符号已加载: {self.token_symbol}")
+            # 3. 初始化数据库管理器
             self.db_manager = DatabaseManager(db_url=config.get("database_url"))
             logger.info("✅ 以太坊钱包插件加载成功，已连接节点和数据库。")
 
@@ -147,7 +152,7 @@ class EthWalletPlugin(Star):
             yield event.plain_result("⌛ 正在查询链上余额，请稍候...")
             token_balance = self.eth_service.get_token_balance(wallet.eth_address)
             eth_balance = self.eth_service.get_eth_balance(wallet.eth_address)
-            yield event.plain_result(f"查询成功！\n💰 代币余额: {token_balance}\n⛽ Gas (ETH): {eth_balance:.6f}")
+            yield event.plain_result(f"查询成功！\n💰 {self.token_symbol}余额: {token_balance}\n⛽ Gas (ETH): {eth_balance:.6f}")
         except Exception as e:
             logger.error(f"查询余额失败 for {qq_id}: {e}")
             yield event.plain_result("❌ 查询失败，请稍后再试。")
@@ -200,7 +205,7 @@ class EthWalletPlugin(Star):
             yield event.plain_result("🤔 不能给自己转账哦。")
             return
 
-        yield event.plain_result(f"⌛ 正在准备向用户 {target_qq_id} 转账 {amount} 代币，请稍候...")
+        yield event.plain_result(f"⌛ 正在准备向用户 {target_qq_id} 转账 {amount} {self.token_symbol}，请稍候...")
         
         session = self.db_manager.get_session()
         try:
@@ -215,9 +220,9 @@ class EthWalletPlugin(Star):
                 return
 
             tx_hash = self.eth_service.transfer_token(sender_wallet.eth_private_key, receiver_wallet.eth_address, amount)
-            yield event.plain_result(f"✅ 转账成功！\n您已向 {target_qq_id} 转账 {amount}。\n交易哈希: `{tx_hash}`")
+            yield event.plain_result(f"✅ 转账成功！\n您已向 {target_qq_id} 转账 {amount} {self.token_symbol}。\n交易哈希: `{tx_hash}`")
         except InsufficientFundsError:
-            yield event.plain_result(f"❌ 转账失败：您的代币余额不足！")
+            yield event.plain_result(f"❌ 转账失败：您的{self.token_symbol}余额不足！")
         except TransactionFailedError as e:
             logger.error(f"转账失败 from {sender_qq_id} to {target_qq_id}: {e}")
             yield event.plain_result(f"❌ 转账失败：交易在链上执行失败，资金已退回。")
@@ -245,11 +250,11 @@ class EthWalletPlugin(Star):
                 yield event.plain_result("❌ 错误：您还没有注册钱包，请先使用 /注册。")
                 return
             
-            yield event.plain_result(f"⌛ 正在向地址 {address} 提现 {amount} 代币，请稍候...")
+            yield event.plain_result(f"⌛ 正在向地址 {address} 提现 {amount} {self.token_symbol}，请稍候...")
             tx_hash = self.eth_service.transfer_token(wallet.eth_private_key, address, amount)
             yield event.plain_result(f"✅ 提现成功！\n交易哈希: `{tx_hash}`")
         except InsufficientFundsError:
-            yield event.plain_result(f"❌ 提现失败：您的代币余额不足！")
+            yield event.plain_result(f"❌ 提现失败：您的{self.token_symbol}余额不足！")
         except Exception as e:
             logger.error(f"提现失败 for {qq_id}: {e}")
             yield event.plain_result(f"❌ 提现失败，发生内部错误。")
@@ -272,7 +277,7 @@ class EthWalletPlugin(Star):
                 return
             
             reward_amount = self._get_check_in_reward()
-            yield event.plain_result(f"⌛ 正在为你签到并发送奖励，请稍候...")
+            yield event.plain_result(f"⌛ 正在为你签到并发送{self.token_symbol}奖励，请稍候...")
             
             owner_pk = self.config.get("owner_private_key")
             if not owner_pk:
@@ -283,7 +288,7 @@ class EthWalletPlugin(Star):
             wallet.last_check_in = datetime.datetime.utcnow()
             session.commit()
             
-            yield event.plain_result(f"🎉 签到成功！你获得了 {reward_amount} 代币奖励！")
+            yield event.plain_result(f"🎉 签到成功！你获得了 {reward_amount} {self.token_symbol}奖励！")
         except Exception as e:
             session.rollback()
             logger.error(f"用户 {qq_id} 签到失败: {e}")
@@ -313,7 +318,7 @@ class EthWalletPlugin(Star):
             # 按余额降序排序
             sorted_balances = sorted(balances, key=lambda item: item[1], reverse=True)
             
-            rank_text = "🏆 代币富豪榜 🏆\n\n"
+            rank_text = f"🏆 {self.token_symbol}富豪榜 🏆\n\n"
             for i, (qq_id, balance) in enumerate(sorted_balances[:10]): # 取前10名
                 rank_text += f"第 {i+1} 名: {qq_id} - 💰 {balance}\n"
             
@@ -344,7 +349,7 @@ class EthWalletPlugin(Star):
                 yield event.plain_result("❌ 管理员私钥未在配置中设置！")
                 return
                 
-            yield event.plain_result(f"⌛ 正在向 {address} 增发 {amount} 代币...")
+            yield event.plain_result(f"⌛ 正在向 {address} 增发 {amount} {self.token_symbol}...")
             tx_hash = self.eth_service.mint_token(owner_pk, address, amount)
             yield event.plain_result(f"✅ 增发成功！\n交易哈希: `{tx_hash}`")
         except Exception as e:
