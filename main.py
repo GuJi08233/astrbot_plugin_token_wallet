@@ -3,6 +3,7 @@ import datetime
 import json
 import random
 from typing import Optional
+from asyncio import Lock
 
 # --- AstrBot Core Imports ---
 from astrbot.api.event import filter, AstrMessageEvent
@@ -44,6 +45,7 @@ class EthWalletPlugin(Star):
         self.eth_service = None
         self.db_manager = None
         self.token_symbol = "代币"  # 默认代币符号
+        self.user_locks = {}  # 用户锁字典，用于防止并发交易导致Nonce冲突
 
         try:
             # 1. 初始化以太坊服务
@@ -65,6 +67,12 @@ class EthWalletPlugin(Star):
             logger.error(f"❌ 插件加载失败，请检查配置或环境。错误: {e}")
 
     # --- 辅助方法 ---
+
+    def _get_user_lock(self, qq_id: int) -> Lock:
+        """获取或创建用户的交易锁"""
+        if qq_id not in self.user_locks:
+            self.user_locks[qq_id] = Lock()
+        return self.user_locks[qq_id]
 
     def _get_check_in_reward(self) -> int:
         """根据配置解析并返回一个带权重随机的签到奖励数量"""
@@ -207,6 +215,10 @@ class EthWalletPlugin(Star):
 
         yield event.plain_result(f"⌛ 正在准备向用户 {target_qq_id} 转账 {amount} {self.token_symbol}，请稍候...")
         
+        # 获取用户锁，防止并发交易导致Nonce冲突
+        user_lock = self._get_user_lock(sender_qq_id)
+        await user_lock.acquire()
+        
         session = self.db_manager.get_session()
         try:
             sender_wallet = session.query(Wallet).filter_by(qq_id=sender_qq_id).first()
@@ -230,6 +242,7 @@ class EthWalletPlugin(Star):
             logger.error(f"转账时发生未知错误: {e}")
             yield event.plain_result(f"❌ 转账失败，发生内部错误。")
         finally:
+            user_lock.release()
             session.close()
 
     @filter.command("提现")
@@ -243,6 +256,11 @@ class EthWalletPlugin(Star):
             return
         
         qq_id = int(event.get_sender_id())
+        
+        # 获取用户锁，防止并发交易导致Nonce冲突
+        user_lock = self._get_user_lock(qq_id)
+        await user_lock.acquire()
+        
         session = self.db_manager.get_session()
         try:
             wallet = session.query(Wallet).filter_by(qq_id=qq_id).first()
@@ -259,11 +277,17 @@ class EthWalletPlugin(Star):
             logger.error(f"提现失败 for {qq_id}: {e}")
             yield event.plain_result(f"❌ 提现失败，发生内部错误。")
         finally:
+            user_lock.release()
             session.close()
 
     @filter.command("签到")
     async def check_in_command(self, event: AstrMessageEvent):
         qq_id = int(event.get_sender_id())
+        
+        # 获取用户锁，防止并发交易导致Nonce冲突
+        user_lock = self._get_user_lock(qq_id)
+        await user_lock.acquire()
+        
         session = self.db_manager.get_session()
         try:
             wallet = session.query(Wallet).filter_by(qq_id=qq_id).first()
@@ -294,6 +318,7 @@ class EthWalletPlugin(Star):
             logger.error(f"用户 {qq_id} 签到失败: {e}")
             yield event.plain_result(f"❌ 签到失败，发生内部错误。")
         finally:
+            user_lock.release()
             session.close()
 
     @filter.command("排行榜")
@@ -342,6 +367,12 @@ class EthWalletPlugin(Star):
         if amount <= 0:
             yield event.plain_result("❌ 增发数量必须大于0！")
             return
+        
+        # 获取管理员锁，防止并发交易导致Nonce冲突
+        # 使用固定的管理员ID作为锁的key
+        admin_id = 0  # 管理员固定ID
+        admin_lock = self._get_user_lock(admin_id)
+        await admin_lock.acquire()
             
         try:
             owner_pk = self.config.get("owner_private_key")
@@ -355,3 +386,5 @@ class EthWalletPlugin(Star):
         except Exception as e:
             logger.error(f"增发失败: {e}")
             yield event.plain_result(f"❌ 增发失败，请检查后台日志。")
+        finally:
+            admin_lock.release()
