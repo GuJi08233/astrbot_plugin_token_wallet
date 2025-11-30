@@ -151,8 +151,8 @@ class EthWalletPlugin(Star):
         try:
             yield event.plain_result("⌛ 正在查询链上余额，请稍候...")
             token_balance = self.eth_service.get_token_balance(wallet.eth_address)
-            eth_balance = self.eth_service.get_eth_balance(wallet.eth_address)
-            yield event.plain_result(f"查询成功！\n💰 {self.token_symbol}余额: {token_balance}\n⛽ Gas (ETH): {eth_balance:.6f}")
+            # eth_balance = self.eth_service.get_eth_balance(wallet.eth_address)  # 注释掉ETH余额查询
+            yield event.plain_result(f"查询成功！\n💰 {self.token_symbol}余额: {token_balance}")
         except Exception as e:
             logger.error(f"查询余额失败 for {qq_id}: {e}")
             yield event.plain_result("❌ 查询失败，请稍后再试。")
